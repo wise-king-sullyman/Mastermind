@@ -2,21 +2,13 @@ class Game
   def initialize(max_turns = 12)
     @game_won = false
     @max_turns = max_turns
+    @player = Player.new
+    @code = Code.new
   end
 
   def play
-    player = Player.new
-    code = Code.new
-    p code.secret
-
-    until @game_won
-      guesses_remaining = @max_turns - player.guess_count
-      break if guesses_remaining.zero?
-
-      puts "#{guesses_remaining} guesses remaining"
-      guess = player.guess
-      @game_won = true if code.solved?(guess)
-    end
+    p @code.secret
+    guess = game_loop
 
     if @game_won
       puts "Congratulations! #{guess.join} was the code!"
@@ -24,6 +16,19 @@ class Game
     end
 
     puts "Loser!"
+  end
+
+  def game_loop
+    until @game_won
+      guesses_remaining = @max_turns - @player.guess_count
+      break if guesses_remaining.zero?
+
+      puts "#{guesses_remaining} guesses remaining"
+      guess = @player.guess
+      @code.feedback(guess)
+      @game_won = true if @code.solved?(guess)
+    end
+    guess
   end
 end
 
@@ -43,7 +48,7 @@ end
 class Code
   attr_accessor :secret
 
-  def initialize(code_length = 4, duplicates = false)
+  def initialize(code_length = 4, duplicates = true)
     @code_length = code_length
     @duplicates = duplicates
     @secret = generate
@@ -66,7 +71,33 @@ class Code
     true if guess == @secret
   end
 
-  def feedback
+  def feedback(guess)
+    code_copy = []
+    @secret.map { |x| code_copy.push(x) }
+    puts "#{location_matches(guess, code_copy)} location matches"
+    puts "#{number_matches(guess, code_copy)} digit matches"
+  end
+
+  def location_matches(guess, code_copy)
+    right_number_and_location = 0
+    guess.each_with_index do |digit, index|
+      if digit == code_copy[index]
+        right_number_and_location += 1
+        code_copy[index] = 7
+      end
+    end
+    right_number_and_location
+  end
+
+  def number_matches(guess, code_copy)
+    right_number_wrong_location = 0
+    guess.each do |digit|
+      if code_copy.include?(digit)
+        right_number_wrong_location += 1
+        code_copy[code_copy.find_index(digit)] = 7
+      end
+    end
+    right_number_wrong_location
   end
 end
 

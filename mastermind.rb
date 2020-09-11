@@ -15,7 +15,7 @@ class Game
       return
     end
 
-    puts "Loser!"
+    puts "Loser! the code was #{@code.secret}"
   end
 
   def game_loop
@@ -24,7 +24,7 @@ class Game
       break if guesses_remaining.zero?
 
       puts "#{guesses_remaining} guesses remaining"
-      guess = @player.guess
+      guess = @player.guess(@code.code_length).split('').map(&:to_i)
       @code.feedback(guess)
       @game_won = true if @code.solved?(guess)
     end
@@ -39,14 +39,20 @@ class Player
     @guess_count = 0
   end
 
-  def guess
+  def guess(code_length)
     @guess_count += 1
-    gets.chomp.split('').map { |digit| digit.to_i }
+    this_guess = gets.chomp
+    unless /[0-5][0-5][0-5][0-5]/.match?(this_guess) && this_guess.size == 4
+      puts "guess must be exactly #{code_length} numbers less than 6!"
+      @guess_count -= 1
+      this_guess = guess(code_length)
+    end
+    this_guess
   end
 end
 
 class Code
-  attr_accessor :secret
+  attr_accessor :secret, :code_length
 
   def initialize(code_length = 4, duplicates = true)
     @code_length = code_length

@@ -1,9 +1,12 @@
+require 'pry'
+
 class Game
   def initialize(max_turns = 12)
     @game_won = false
     @max_turns = max_turns
     @player = Player.new
     @code = Code.new
+    @ai = Ai.new
   end
 
   def play_codebreaker
@@ -25,7 +28,7 @@ class Game
 
       puts "\n \t#{guesses_remaining} guesses remaining"
       guess = @player.guess(@code.code_length).split('').map(&:to_i)
-      @code.feedback(guess)
+      @code.codebreaker_feedback(guess)
       @game_won = true if @code.solved?(guess)
     end
     guess
@@ -34,11 +37,16 @@ class Game
   def play_codemaker
     p "Enter code"
     @code.secret = @player.guess(@code.code_length).split('').map(&:to_i)
-    ai_guess = @code.generate
-    until @code.solved?(ai_guess)
-      ai_guess = @code.generate
+    old_guess = @ai.guess
+    until @game_won
+      break if @ai.guess_count == @max_turns
+
+      new_guess = @ai.guess(@code.codemaker_feedback(old_guess))
+      @game_won = true if @code.solved?(new_guess)
+      old_guess = new_guess
     end
-    p "The AI cracked the code! It was #{@code.secret}"
+    p "The AI cracked the code in #{@ai.guess_count} guesses! \
+    It was #{@code.secret}"
   end
 end
 
@@ -87,13 +95,19 @@ class Code
     true if guess == @secret
   end
 
-  def feedback(guess)
+  def codebreaker_feedback(guess)
     code_copy = []
     @secret.map { |x| code_copy.push(x) }
     puts "Numbers in code and in right location: \
     #{location_matches(guess, code_copy)}"
     puts "Numbers in code but in wrong location: \
     #{number_matches(guess, code_copy)}"
+  end
+
+  def codemaker_feedback(guess)
+    code_copy = []
+    @secret.map { |x| code_copy.push(x) }
+    [location_matches(guess, code_copy),number_matches(guess, code_copy)]
   end
 
   def location_matches(guess, code_copy)
@@ -119,10 +133,60 @@ class Code
   end
 end
 
-class Ai
-  def guess
+class Ai < Code
+  attr_accessor :guess_count
+
+  def initialize
+    @guess_count = 0
+    @set = create_set
+    @previous_guess = [1, 1, 2, 2]
+  end
+
+  def guess(*feedback)
+    @guess_count += 1
+    return @previous_guess if @guess_count == 1
+
+    narrow_set(feedback.first, @previous_guess)
+    @previous_guess = @set.first
+    p "Ai is picking #{@previous_guess}"
+    @previous_guess
+  end
+
+  def narrow_set(feedback, previous_guess)
+    @set.delete_if { |possible_code|
+      evaluate_code(possible_code, previous_guess) != feedback
+    }
+  end
+
+  def evaluate_code(possible_code, previous_guess)
+    code_copy = []
+    possible_code.map { |x| code_copy.push(x) }
+    [
+      location_matches(previous_guess, code_copy),
+      number_matches(previous_guess, code_copy)
+    ]
+  end
+
+  def create_set
+    set = []
+    (0..5555).each do |num|
+      split_array = num.to_s.split('').map(&:to_i)
+      next if split_array.any? {|x| x > 5}
+
+      if split_array.size == 4
+        set.push(split_array)
+        next
+      end
+
+      until split_array.size == 4
+        split_array.unshift(0)
+      end
+      set.push(split_array)
+    end
+    set
   end
 end
 
 game = Game.new
-game.play_codemaker
+puts "Enter 1 for codebreaker, or 2 for codemaker"
+gets.chomp.to_i == 1 ? game.play_codebreaker : game.play_codemaker

@@ -6,29 +6,39 @@ class Game
     @code = Code.new
   end
 
-  def play
+  def play_codebreaker
     p @code.secret
-    guess = game_loop
+    guess = codebreaker_loop
 
     if @game_won
-      puts "Congratulations! #{guess.join} was the code!"
+      puts "\n \tCongratulations! #{guess.join} was the code!"
       return
     end
 
-    puts "Loser! the code was #{@code.secret}"
+    puts "\n \tLoser! the code was #{@code.secret}"
   end
 
-  def game_loop
+  def codebreaker_loop
     until @game_won
       guesses_remaining = @max_turns - @player.guess_count
       break if guesses_remaining.zero?
 
-      puts "#{guesses_remaining} guesses remaining"
+      puts "\n \t#{guesses_remaining} guesses remaining"
       guess = @player.guess(@code.code_length).split('').map(&:to_i)
       @code.feedback(guess)
       @game_won = true if @code.solved?(guess)
     end
     guess
+  end
+
+  def play_codemaker
+    p "Enter code"
+    @code.secret = @player.guess(@code.code_length).split('').map(&:to_i)
+    ai_guess = @code.generate
+    until @code.solved?(ai_guess)
+      ai_guess = @code.generate
+    end
+    p "The AI cracked the code! It was #{@code.secret}"
   end
 end
 
@@ -80,8 +90,10 @@ class Code
   def feedback(guess)
     code_copy = []
     @secret.map { |x| code_copy.push(x) }
-    puts "#{location_matches(guess, code_copy)} location matches"
-    puts "#{number_matches(guess, code_copy)} digit matches"
+    puts "Numbers in code and in right location: \
+    #{location_matches(guess, code_copy)}"
+    puts "Numbers in code but in wrong location: \
+    #{number_matches(guess, code_copy)}"
   end
 
   def location_matches(guess, code_copy)
@@ -107,5 +119,10 @@ class Code
   end
 end
 
+class Ai
+  def guess
+  end
+end
+
 game = Game.new
-game.play
+game.play_codemaker

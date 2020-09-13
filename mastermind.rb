@@ -1,3 +1,5 @@
+require 'pry'
+
 class Match
   def initialize(settings)
     @match_won = false
@@ -74,6 +76,7 @@ class Code
     @code_length = code_length
     @duplicates = duplicates
     @secret = generate
+    
   end
 
   def generate
@@ -94,37 +97,43 @@ class Code
   end
 
   def codebreaker_feedback(guess)
-    code_copy = []
-    @secret.map { |x| code_copy.push(x) }
+    guess_copy = []
+    guess.map { |x| guess_copy.push(x) }
+    secret_copy = []
+    @secret.map { |x| secret_copy.push(x)}
     puts "Numbers in code and in right location: \
-    #{location_matches(guess, code_copy)}"
+    #{location_matches(guess_copy, secret_copy)}"
     puts "Numbers in code but in wrong location: \
-    #{number_matches(guess, code_copy)}"
+    #{number_matches(guess_copy, secret_copy)}"
   end
 
   def codemaker_feedback(guess)
-    code_copy = []
-    @secret.map { |x| code_copy.push(x) }
-    [location_matches(guess, code_copy), number_matches(guess, code_copy)]
+    guess_copy = []
+    guess.map { |x| guess_copy.push(x) }
+    secret_copy = []
+    @secret.map { |x| secret_copy.push(x)}
+    [location_matches(guess_copy, secret_copy), number_matches(guess_copy, secret_copy)]
   end
 
-  def location_matches(guess, code_copy)
+  def location_matches(guess_copy, secret_copy)
     right_number_and_location = 0
-    guess.each_with_index do |digit, index|
-      if digit == code_copy[index]
+    guess_copy.each_with_index do |digit, index|
+      if digit == secret_copy[index]
         right_number_and_location += 1
-        code_copy[index] = 7
+        guess_copy[index] = 8
+        secret_copy[index] = 7
       end
     end
     right_number_and_location
   end
 
-  def number_matches(guess, code_copy)
+  def number_matches(guess_copy, secret_copy)
     right_number_wrong_location = 0
-    guess.each do |digit|
-      if code_copy.include?(digit)
+    guess_copy.each do |digit|
+      if secret_copy.include?(digit)
         right_number_wrong_location += 1
-        code_copy[code_copy.find_index(digit)] = 7
+        guess_copy[guess_copy.find_index(digit)] = 8
+        secret_copy[secret_copy.find_index(digit)] = 7
       end
     end
     right_number_wrong_location
@@ -142,9 +151,13 @@ class Ai < Code
 
   def guess(*feedback)
     @guess_count += 1
-    return @previous_guess if @guess_count == 1
-
+    if @guess_count == 1
+      p "Ai is picking #{@previous_guess}"
+      return @previous_guess
+    end
     narrow_set(feedback.first, @previous_guess)
+    p @previous_guess
+    puts "All options eliminated" if @set.empty?
     @previous_guess = @set.first
     p "Ai is picking #{@previous_guess}"
     @previous_guess
@@ -157,11 +170,13 @@ class Ai < Code
   end
 
   def evaluate_code(possible_code, previous_guess)
-    code_copy = []
-    possible_code.map { |x| code_copy.push(x) }
+    guess_copy = []
+    possible_code.map { |x| guess_copy.push(x) }
+    previous_guess_copy = []
+    previous_guess.map { |x| previous_guess_copy.push(x)}
     [
-      location_matches(previous_guess, code_copy),
-      number_matches(previous_guess, code_copy)
+      location_matches(guess_copy, previous_guess_copy),
+      number_matches(guess_copy, previous_guess_copy)
     ]
   end
 

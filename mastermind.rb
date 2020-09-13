@@ -1,11 +1,9 @@
-require 'pry'
-
-class Game
-  def initialize(max_turns = 12)
-    @game_won = false
-    @max_turns = max_turns
+class Match
+  def initialize(settings)
+    @match_won = false
+    @max_turns = settings[:max_turns]
     @player = Player.new
-    @code = Code.new
+    @code = Code.new(settings[:code_length], settings[:duplicates])
     @ai = Ai.new
   end
 
@@ -13,7 +11,7 @@ class Game
     p @code.secret
     guess = codebreaker_loop
 
-    if @game_won
+    if @match_won
       puts "\n \tCongratulations! #{guess.join} was the code!"
       return
     end
@@ -22,14 +20,14 @@ class Game
   end
 
   def codebreaker_loop
-    until @game_won
+    until @match_won
       guesses_remaining = @max_turns - @player.guess_count
       break if guesses_remaining.zero?
 
       puts "\n \t#{guesses_remaining} guesses remaining"
       guess = @player.guess(@code.code_length).split('').map(&:to_i)
       @code.codebreaker_feedback(guess)
-      @game_won = true if @code.solved?(guess)
+      @match_won = true if @code.solved?(guess)
     end
     guess
   end
@@ -38,11 +36,11 @@ class Game
     p "Enter code"
     @code.secret = @player.guess(@code.code_length).split('').map(&:to_i)
     old_guess = @ai.guess
-    until @game_won
+    until @match_won
       break if @ai.guess_count == @max_turns
 
       new_guess = @ai.guess(@code.codemaker_feedback(old_guess))
-      @game_won = true if @code.solved?(new_guess)
+      @match_won = true if @code.solved?(new_guess)
       old_guess = new_guess
     end
     p "The AI cracked the code in #{@ai.guess_count} guesses! \
@@ -72,7 +70,7 @@ end
 class Code
   attr_accessor :secret, :code_length
 
-  def initialize(code_length = 4, duplicates = true)
+  def initialize(code_length, duplicates)
     @code_length = code_length
     @duplicates = duplicates
     @secret = generate
@@ -107,7 +105,7 @@ class Code
   def codemaker_feedback(guess)
     code_copy = []
     @secret.map { |x| code_copy.push(x) }
-    [location_matches(guess, code_copy),number_matches(guess, code_copy)]
+    [location_matches(guess, code_copy), number_matches(guess, code_copy)]
   end
 
   def location_matches(guess, code_copy)
@@ -187,6 +185,32 @@ class Ai < Code
   end
 end
 
+class Game
+  def initialize
+    @game_won = false
+    @round_counter = 0
+    @settings = {
+      max_turns: 12,
+      code_length: 4,
+      duplicates: true,
+      rounds: 4
+    }
+  end
+
+  def play(rounds)
+    until @game_won
+      if @round_counter == rounds
+        puts "Tie game"
+        break
+      end
+      match = Match.new(@settings)
+      @round_counter += 1
+      puts "Round #{@round_counter}"
+      @round_counter.odd? ? match.play_codebreaker : match.play_codemaker
+    end
+  end
+end
+puts 'Welcome to Mastermind! Hit "Enter" to start or "s" to change settings'
+
 game = Game.new
-puts "Enter 1 for codebreaker, or 2 for codemaker"
-gets.chomp.to_i == 1 ? game.play_codebreaker : game.play_codemaker
+game.play(4)

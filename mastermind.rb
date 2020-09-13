@@ -6,7 +6,7 @@ class Match
     @max_turns = settings[:max_turns]
     @player = Player.new
     @code = Code.new(settings[:code_length], settings[:duplicates])
-    @ai = Ai.new
+    @ai = Ai.new(settings[:code_length])
   end
 
   def play_codebreaker
@@ -60,12 +60,17 @@ class Player
   def guess(code_length)
     @guess_count += 1
     this_guess = gets.chomp
-    unless /[0-5][0-5][0-5][0-5]/.match?(this_guess) && this_guess.size == 4
+    unless valid?(this_guess, code_length)
       puts "guess must be exactly #{code_length} numbers less than 6!"
       @guess_count -= 1
       this_guess = guess(code_length)
     end
     this_guess
+  end
+
+  def valid?(guess, code_length)
+    true if guess.split('').all? { |n| /[0-5]/.match?(n) } &&
+            guess.size == code_length
   end
 end
 
@@ -143,9 +148,9 @@ end
 class Ai < Code
   attr_accessor :guess_count
 
-  def initialize
+  def initialize(code_length)
     @guess_count = 0
-    @set = create_set
+    @set = create_set(code_length)
     @previous_guess = [1, 1, 2, 2]
   end
 
@@ -180,23 +185,23 @@ class Ai < Code
     ]
   end
 
-  def create_set
+  def create_set(code_length)
     set = []
-    (0..5555).each do |num|
+    upper_bound = create_upper_bound(code_length)
+    (0..upper_bound).each do |num|
       split_array = num.to_s.split('').map(&:to_i)
-      next if split_array.any? {|x| x > 5}
+      next if split_array.any? { |x| x > 5 }
 
-      if split_array.size == 4
-        set.push(split_array)
-        next
-      end
-
-      until split_array.size == 4
-        split_array.unshift(0)
-      end
+      split_array.unshift(0) until split_array.size == code_length
       set.push(split_array)
     end
     set
+  end
+
+  def create_upper_bound(code_length)
+    upper_bound_array = []
+    upper_bound_array.push(5) until upper_bound_array.size == code_length
+    upper_bound_array.join.to_i
   end
 end
 
@@ -206,7 +211,7 @@ class Game
     @round_counter = 0
     @settings = {
       max_turns: 12,
-      code_length: 4,
+      code_length: 6,
       duplicates: true,
       rounds: 4
     }

@@ -1,5 +1,6 @@
-require 'pry'
+# frozen_string_literal: true
 
+# Responsible for operation of each "match" or "round" of the game
 class Match
   def initialize(settings)
     @match_won = false
@@ -35,7 +36,7 @@ class Match
   end
 
   def play_codemaker
-    p "Enter code"
+    p 'Enter code'
     @code.secret = @player.guess(@code.code_length).split('').map(&:to_i)
     old_guess = @ai.guess
     until @match_won
@@ -45,11 +46,11 @@ class Match
       @match_won = true if @code.solved?(new_guess)
       old_guess = new_guess
     end
-    p "The AI cracked the code in #{@ai.guess_count} guesses! \
-    It was #{@code.secret}"
+    p "The AI cracked the code in #{@ai.guess_count} guesses!"
   end
 end
 
+# Responsible for interactions with the human player
 class Player
   attr_accessor :name, :guess_count
 
@@ -74,6 +75,7 @@ class Player
   end
 end
 
+# Responsible for operations related to the secret code being guessed
 class Code
   attr_accessor :secret, :code_length
 
@@ -81,7 +83,6 @@ class Code
     @code_length = code_length
     @duplicates = duplicates
     @secret = generate
-    
   end
 
   def generate
@@ -123,11 +124,11 @@ class Code
   def location_matches(guess_copy, secret_copy)
     right_number_and_location = 0
     guess_copy.each_with_index do |digit, index|
-      if digit == secret_copy[index]
-        right_number_and_location += 1
-        guess_copy[index] = 8
-        secret_copy[index] = 7
-      end
+      next unless digit == secret_copy[index]
+
+      right_number_and_location += 1
+      guess_copy[index] = 8
+      secret_copy[index] = 7
     end
     right_number_and_location
   end
@@ -135,16 +136,17 @@ class Code
   def number_matches(guess_copy, secret_copy)
     right_number_wrong_location = 0
     guess_copy.each do |digit|
-      if secret_copy.include?(digit)
-        right_number_wrong_location += 1
-        guess_copy[guess_copy.find_index(digit)] = 8
-        secret_copy[secret_copy.find_index(digit)] = 7
-      end
+      next unless secret_copy.include?(digit)
+
+      right_number_wrong_location += 1
+      guess_copy[guess_copy.find_index(digit)] = 8
+      secret_copy[secret_copy.find_index(digit)] = 7
     end
     right_number_wrong_location
   end
 end
 
+# Responsible for actions of the computer "player"
 class Ai < Code
   attr_accessor :guess_count
 
@@ -161,8 +163,6 @@ class Ai < Code
       return @previous_guess
     end
     narrow_set(feedback.first, @previous_guess)
-    p @previous_guess
-    puts "All options eliminated" if @set.empty?
     @previous_guess = @set.first
     p "Ai is picking #{@previous_guess}"
     @previous_guess
@@ -205,13 +205,14 @@ class Ai < Code
   end
 end
 
+# Responsible for operation of the overarching game being played
 class Game
   def initialize
     @game_won = false
     @round_counter = 0
     @settings = {
       max_turns: 12,
-      code_length: 6,
+      code_length: 4,
       duplicates: true,
       rounds: 4
     }
@@ -220,7 +221,7 @@ class Game
   def play(rounds)
     until @game_won
       if @round_counter == rounds
-        puts "Tie game"
+        puts 'Tie game'
         break
       end
       match = Match.new(@settings)

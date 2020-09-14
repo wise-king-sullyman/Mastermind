@@ -3,6 +3,7 @@
 # Responsible for operation of each "match" or "round" of the game
 class Match
   def initialize(settings)
+    @settings = settings
     @match_won = false
     @max_turns = settings[:max_turns]
     @player = Player.new
@@ -16,10 +17,11 @@ class Match
 
     if @match_won
       puts "\n \tCongratulations! #{guess.join} was the code!"
-      return
+      return 1
     end
 
     puts "\n \tLoser! the code was #{@code.secret}"
+    return 0
   end
 
   def codebreaker_loop
@@ -28,7 +30,7 @@ class Match
       break if guesses_remaining.zero?
 
       puts "\n \t#{guesses_remaining} guesses remaining"
-      guess = @player.guess(@code.code_length).split('').map(&:to_i)
+      guess = @player.guess(@settings).split('').map(&:to_i)
       @code.codebreaker_feedback(guess)
       @match_won = true if @code.solved?(guess)
     end
@@ -37,16 +39,17 @@ class Match
 
   def play_codemaker
     p 'Enter code'
-    @code.secret = @player.guess(@code.code_length).split('').map(&:to_i)
+    @code.secret = @player.guess(@settings).split('').map(&:to_i)
     old_guess = @ai.guess
     until @match_won
-      break if @ai.guess_count == @max_turns
+      return 0 if @ai.guess_count == @max_turns
 
       new_guess = @ai.guess(@code.codemaker_feedback(old_guess))
       @match_won = true if @code.solved?(new_guess)
       old_guess = new_guess
     end
     p "The AI cracked the code in #{@ai.guess_count} guesses!"
+    1
   end
 end
 
@@ -58,20 +61,25 @@ class Player
     @guess_count = 0
   end
 
-  def guess(code_length)
+  def guess(settings)
     @guess_count += 1
+    code_length = settings[:code_length]
     this_guess = gets.chomp
-    unless valid?(this_guess, code_length)
+    unless valid?(this_guess, settings)
       puts "guess must be exactly #{code_length} numbers less than 6!"
+      puts 'duplicates are disabled' unless settings[:duplicates]
       @guess_count -= 1
-      this_guess = guess(code_length)
+      this_guess = guess(settings)
     end
     this_guess
   end
 
-  def valid?(guess, code_length)
+  def valid?(guess, settings)
+    return false unless settings[:duplicates] ||
+                        guess.split('').uniq.size == guess.size
+
     true if guess.split('').all? { |n| /[0-5]/.match?(n) } &&
-            guess.size == code_length
+            guess.size == settings[:code_length]
   end
 end
 
@@ -178,7 +186,7 @@ class Ai < Code
     guess_copy = []
     possible_code.map { |x| guess_copy.push(x) }
     previous_guess_copy = []
-    previous_guess.map { |x| previous_guess_copy.push(x)}
+    previous_guess.map { |x| previous_guess_copy.push(x) }
     [
       location_matches(guess_copy, previous_guess_copy),
       number_matches(guess_copy, previous_guess_copy)
@@ -208,7 +216,8 @@ end
 # Responsible for operation of the overarching game being played
 class Game
   def initialize
-    @game_won = false
+    @player_won = 0
+    @ai_won = 0
     @round_counter = 0
     @settings = {
       max_turns: 12,
@@ -218,20 +227,60 @@ class Game
     }
   end
 
-  def play(rounds)
-    until @game_won
-      if @round_counter == rounds
-        puts 'Tie game'
-        break
-      end
+  def play
+    game_loop
+    if @player_won == @ai_won
+      puts "\n Tie game"
+    elsif @player_won > @ai_won
+      puts "\n Conratulations!! You won the game!"
+    else
+      puts "\n Skynet's world domination has begun! Game over! You lose!"
+    end
+  end
+
+  def game_loop
+    until @round_counter == @settings[:rounds] || game_over
       match = Match.new(@settings)
       @round_counter += 1
       puts "Round #{@round_counter}"
-      @round_counter.odd? ? match.play_codebreaker : match.play_codemaker
+      if @round_counter.odd?
+        @player_won += match.play_codebreaker
+      else
+        @ai_won += match.play_codemaker
+      end
     end
   end
+
+  def edit_settings
+    @settings.each do |name, value|
+      puts "#{name} is set to #{value}, would you like to change it? y/n"
+      input = gets.chomp
+      if input == 'y' && name == :duplicates
+        switch_duplicates
+      elsif input == 'y'
+        puts 'please enter new value'
+        @settings[name] = gets.chomp.to_i
+      end
+    end
+  end
+
+  def switch_duplicates
+    if @settings[:duplicates]
+      puts 'duplicates disabled'
+      @settings[:duplicates] = false
+    else
+      puts 'duplicates enabled'
+      @settings[:duplicates] = true
+    end
+  end
+
+  def game_over
+    rounds = @settings[:rounds] 
+    true if @player_won > (rounds / 2) || @ai_won > (rounds / 2)
+  end
 end
-puts 'Welcome to Mastermind! Hit "Enter" to start or "s" to change settings'
 
 game = Game.new
-game.play(4)
+puts 'Welcome to Mastermind! Hit "Enter" to start or "s" to change settings'
+game.edit_settings if gets.chomp == 's'
+game.play

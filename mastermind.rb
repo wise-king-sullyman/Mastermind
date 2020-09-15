@@ -53,6 +53,7 @@ class Match
   def codemaker_loop_hard
     old_guess = @ai.guess
     until @match_won
+      sleep(1)
       break if @ai.guess_count == @max_turns
 
       new_guess = @ai.guess(@code.codemaker_feedback(old_guess))
@@ -63,6 +64,7 @@ class Match
 
   def codemaker_loop_easy
     until @match_won
+      sleep(1)
       break if @ai.guess_count == @max_turns
 
       guess = @ai.generate
@@ -190,19 +192,19 @@ class Ai < Code
   def guess(*feedback)
     @guess_count += 1
     if @guess_count == 1
-      p "Ai is picking #{@previous_guess.join}"
+      p "Ai is guessing #{@previous_guess.join}"
       return @previous_guess
     end
     narrow_set(feedback.first, @previous_guess)
     @previous_guess = @set.first
-    p "Ai is picking #{@previous_guess.join}"
+    p "Ai is guessing #{@previous_guess.join}"
     @previous_guess
   end
 
   def generate
     @guess_count += 1
     guess = super
-    p "Ai is picking #{guess.join}"
+    p "Ai is guessing #{guess.join}"
   end
 
   def narrow_set(feedback, previous_guess)

@@ -114,7 +114,7 @@ class Code
   def generate
     secret = []
     until secret.size == @code_length
-      n = rand(5)
+      n = rand(6)
       if @duplicates
         secret.push(n)
         next

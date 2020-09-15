@@ -13,7 +13,6 @@ class Match
   end
 
   def play_codebreaker
-    p @code.secret
     guess = codebreaker_loop
 
     if @match_won
@@ -21,7 +20,7 @@ class Match
       return 1
     end
 
-    puts "\n \tLoser! the code was #{@code.secret}"
+    puts "\n \tLoser! the code was #{@code.secret.join}"
     0
   end
 

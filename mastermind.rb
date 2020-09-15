@@ -8,7 +8,8 @@ class Match
     @max_turns = settings[:max_turns]
     @player = Player.new
     @code = Code.new(settings[:code_length], settings[:duplicates])
-    @ai = Ai.new(settings[:code_length])
+    @ai = Ai.new(settings)
+    @intelligent_ai = settings[:intelligent_ai]
   end
 
   def play_codebreaker
@@ -21,7 +22,7 @@ class Match
     end
 
     puts "\n \tLoser! the code was #{@code.secret}"
-    return 0
+    0
   end
 
   def codebreaker_loop
@@ -40,16 +41,33 @@ class Match
   def play_codemaker
     p 'Enter code'
     @code.secret = @player.guess(@settings).split('').map(&:to_i)
+    @intelligent_ai ? codemaker_loop_hard : codemaker_loop_easy
+    unless @match_won
+      p "You beat the AI! It wasn't able to guess your code!"
+      return 0
+    end
+    p "The AI cracked the code in #{@ai.guess_count} guesses!"
+    1
+  end
+
+  def codemaker_loop_hard
     old_guess = @ai.guess
     until @match_won
-      return 0 if @ai.guess_count == @max_turns
+      break if @ai.guess_count == @max_turns
 
       new_guess = @ai.guess(@code.codemaker_feedback(old_guess))
       @match_won = true if @code.solved?(new_guess)
       old_guess = new_guess
     end
-    p "The AI cracked the code in #{@ai.guess_count} guesses!"
-    1
+  end
+
+  def codemaker_loop_easy
+    until @match_won
+      break if @ai.guess_count == @max_turns
+
+      guess = @ai.generate
+      @match_won = true if @code.solved?(guess)
+    end
   end
 end
 
@@ -126,7 +144,10 @@ class Code
     guess.map { |x| guess_copy.push(x) }
     secret_copy = []
     @secret.map { |x| secret_copy.push(x)}
-    [location_matches(guess_copy, secret_copy), number_matches(guess_copy, secret_copy)]
+    [
+      location_matches(guess_copy, secret_copy), 
+      number_matches(guess_copy, secret_copy)
+    ]
   end
 
   def location_matches(guess_copy, secret_copy)
@@ -158,22 +179,30 @@ end
 class Ai < Code
   attr_accessor :guess_count
 
-  def initialize(code_length)
+  def initialize(settings)
+    @code_length = settings[:code_length]
     @guess_count = 0
-    @set = create_set(code_length)
+    @set = create_set
     @previous_guess = [1, 1, 2, 2]
+    @duplicates = settings[:duplicates]
   end
 
   def guess(*feedback)
     @guess_count += 1
     if @guess_count == 1
-      p "Ai is picking #{@previous_guess}"
+      p "Ai is picking #{@previous_guess.join}"
       return @previous_guess
     end
     narrow_set(feedback.first, @previous_guess)
     @previous_guess = @set.first
-    p "Ai is picking #{@previous_guess}"
+    p "Ai is picking #{@previous_guess.join}"
     @previous_guess
+  end
+
+  def generate
+    @guess_count += 1
+    guess = super
+    p "Ai is picking #{guess.join}"
   end
 
   def narrow_set(feedback, previous_guess)
@@ -193,22 +222,22 @@ class Ai < Code
     ]
   end
 
-  def create_set(code_length)
+  def create_set
     set = []
-    upper_bound = create_upper_bound(code_length)
+    upper_bound = create_upper_bound
     (0..upper_bound).each do |num|
       split_array = num.to_s.split('').map(&:to_i)
       next if split_array.any? { |x| x > 5 }
 
-      split_array.unshift(0) until split_array.size == code_length
+      split_array.unshift(0) until split_array.size == @code_length
       set.push(split_array)
     end
     set
   end
 
-  def create_upper_bound(code_length)
+  def create_upper_bound
     upper_bound_array = []
-    upper_bound_array.push(5) until upper_bound_array.size == code_length
+    upper_bound_array.push(5) until upper_bound_array.size == @code_length
     upper_bound_array.join.to_i
   end
 end
@@ -223,7 +252,8 @@ class Game
       max_turns: 12,
       code_length: 4,
       duplicates: true,
-      rounds: 4
+      rounds: 4,
+      intelligent_ai: true
     }
   end
 
@@ -255,8 +285,8 @@ class Game
     @settings.each do |name, value|
       puts "#{name} is set to #{value}, would you like to change it? y/n"
       input = gets.chomp
-      if input == 'y' && name == :duplicates
-        switch_duplicates
+      if input == 'y' && ( name == :duplicates || name == :intelligent_ai )
+        switch_setting(name)
       elsif input == 'y'
         puts 'please enter new value'
         @settings[name] = gets.chomp.to_i
@@ -264,18 +294,18 @@ class Game
     end
   end
 
-  def switch_duplicates
-    if @settings[:duplicates]
-      puts 'duplicates disabled'
-      @settings[:duplicates] = false
+  def switch_setting(setting)
+    if @settings[setting]
+      puts "#{setting} disabled"
+      @settings[setting] = false
     else
-      puts 'duplicates enabled'
-      @settings[:duplicates] = true
+      puts "#{setting} enabled"
+      @settings[setting] = true
     end
   end
 
   def game_over
-    rounds = @settings[:rounds] 
+    rounds = @settings[:rounds]
     true if @player_won > (rounds / 2) || @ai_won > (rounds / 2)
   end
 end

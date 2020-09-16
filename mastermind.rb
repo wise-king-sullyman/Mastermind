@@ -1,5 +1,18 @@
 # frozen_string_literal: true
 
+INSTRUCTIONS = <<~INSTRUCTIONS
+  The computer will select a random code and you will have a limited number of 
+  turns to guess it. After each guess you will receive feedback telling you how 
+  many of the numbers in your guess were the correct number in the correct 
+  location, and how many of the numbers in your guess were the correct number 
+  but located in a different place than in the secret code. If you guess the 
+  code you earn 1 point. You then create a secret code and it is up to the 
+  computer to guess it. The player with the most points at the end of the game
+  wins! Default settings have 12 turns (guesses) per round, a code length of 4, 
+  4 rounds per game, allows duplicates and has the AI you are playing against 
+  on hard difficulty.
+INSTRUCTIONS
+
 # Responsible for operation of each "match" or "round" of the game
 class Match
   def initialize(settings)
@@ -16,7 +29,8 @@ class Match
     guess = codebreaker_loop
 
     if @match_won
-      puts "\n \tCongratulations! #{guess.join} was the code!"
+      puts "\n \tCongratulations! #{guess.join} was the code and you got it " \
+      "in #{@player.guess_count} guesses!"
       return 1
     end
 
@@ -85,7 +99,7 @@ class Player
     code_length = settings[:code_length]
     this_guess = gets.chomp
     unless valid?(this_guess, settings)
-      puts "guess must be exactly #{code_length} numbers less than 6!"
+      puts "guess must be #{code_length} numbers with value less than 6"
       puts 'duplicates are disabled' unless settings[:duplicates]
       @guess_count -= 1
       this_guess = guess(settings)
@@ -311,7 +325,23 @@ class Game
   end
 end
 
-game = Game.new
-puts 'Welcome to Mastermind! Hit "Enter" to start or "s" to change settings'
-game.edit_settings if gets.chomp == 's'
-game.play
+quit = false
+
+until quit
+  puts "\n Welcome to Mastermind! Hit 'Enter' to start, 'i' for " \
+  "instructions, 's' to change settings, or type 'quit' to end\n"
+  pregame_input = gets.chomp
+  if pregame_input == 'quit'
+    puts 'Exiting game'
+    quit = true
+    next
+  elsif pregame_input == 'i'
+    puts INSTRUCTIONS
+    next
+  end
+  game = Game.new
+  game.edit_settings if pregame_input == 's'
+  game.play
+  puts "\n New game starting"
+  sleep(2)
+end

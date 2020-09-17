@@ -38,19 +38,6 @@ class Match
     0
   end
 
-  def codebreaker_loop
-    until @match_won
-      guesses_remaining = @max_turns - @player.guess_count
-      break if guesses_remaining.zero?
-
-      puts "\n \t#{guesses_remaining} guesses remaining"
-      guess = @player.guess(@settings).split('').map(&:to_i)
-      @code.codebreaker_feedback(guess)
-      @match_won = true if @code.solved?(guess)
-    end
-    guess
-  end
-
   def play_codemaker
     p 'Enter code'
     @code.secret = @player.guess(@settings).split('').map(&:to_i)
@@ -63,13 +50,28 @@ class Match
     1
   end
 
+  private
+
+  def codebreaker_loop
+    until @match_won
+      guesses_remaining = @max_turns - @player.guess_count
+      break if guesses_remaining.zero?
+
+      puts "\n \t#{guesses_remaining} guesses remaining"
+      guess = @player.guess(@settings).split('').map(&:to_i)
+      @code.feedback(guess)
+      @match_won = true if @code.solved?(guess)
+    end
+    guess
+  end
+
   def codemaker_loop_hard
     old_guess = @ai.guess
     until @match_won
       sleep(1)
       break if @ai.guess_count == @max_turns
 
-      new_guess = @ai.guess(@code.codemaker_feedback(old_guess))
+      new_guess = @ai.guess(@code.feedback(old_guess))
       @match_won = true if @code.solved?(new_guess)
       old_guess = new_guess
     end
@@ -88,7 +90,7 @@ end
 
 # Responsible for interactions with the human player
 class Player
-  attr_accessor :name, :guess_count
+  attr_accessor :guess_count
 
   def initialize
     @guess_count = 0
@@ -107,6 +109,8 @@ class Player
     this_guess
   end
 
+  private
+
   def valid?(guess, settings)
     return false unless settings[:duplicates] ||
                         guess.split('').uniq.size == guess.size
@@ -118,7 +122,7 @@ end
 
 # Responsible for operations related to the secret code being guessed
 class Code
-  attr_accessor :secret, :code_length
+  attr_accessor :secret
 
   def initialize(code_length, duplicates)
     @code_length = code_length
@@ -143,27 +147,17 @@ class Code
     true if guess == @secret
   end
 
-  def codebreaker_feedback(guess)
-    guess_copy = []
-    guess.map { |x| guess_copy.push(x) }
-    secret_copy = []
-    @secret.map { |x| secret_copy.push(x)}
-    puts "Numbers in code and in right location: \
-    #{location_matches(guess_copy, secret_copy)}"
-    puts "Numbers in code but in wrong location: \
-    #{number_matches(guess_copy, secret_copy)}"
+  def feedback(guess)
+    guess_copy = guess.map { |x| x }
+    secret_copy = @secret.map { |x| x }
+    location_matches = location_matches(guess_copy, secret_copy)
+    number_matches = number_matches(guess_copy, secret_copy)
+    puts "Numbers in code and in right location: \ #{location_matches}"
+    puts "Numbers in code but in wrong location: \ #{number_matches}"
+    [location_matches, number_matches]
   end
 
-  def codemaker_feedback(guess)
-    guess_copy = []
-    guess.map { |x| guess_copy.push(x) }
-    secret_copy = []
-    @secret.map { |x| secret_copy.push(x)}
-    [
-      location_matches(guess_copy, secret_copy), 
-      number_matches(guess_copy, secret_copy)
-    ]
-  end
+  private
 
   def location_matches(guess_copy, secret_copy)
     right_number_and_location = 0
@@ -221,19 +215,17 @@ class Ai < Code
   end
 
   def narrow_set(feedback, previous_guess)
-    @set.delete_if { |possible_code|
+    @set.delete_if do |possible_code|
       evaluate_code(possible_code, previous_guess) != feedback
-    }
+    end
   end
 
   def evaluate_code(possible_code, previous_guess)
-    guess_copy = []
-    possible_code.map { |x| guess_copy.push(x) }
-    previous_guess_copy = []
-    previous_guess.map { |x| previous_guess_copy.push(x) }
+    possible_code_copy = possible_code.map { |x| x }
+    previous_guess_copy = previous_guess.map { |x| x }
     [
-      location_matches(guess_copy, previous_guess_copy),
-      number_matches(guess_copy, previous_guess_copy)
+      location_matches(possible_code_copy, previous_guess_copy),
+      number_matches(possible_code_copy, previous_guess_copy)
     ]
   end
 
@@ -283,6 +275,17 @@ class Game
     end
   end
 
+  def edit_settings
+    @settings.each do |name, value|
+      puts "#{name} is set to #{value}, would you like to change it? y/n"
+      next unless gets.chomp == 'y'
+
+      handle_settings_selection(name)
+    end
+  end
+
+  private
+
   def game_loop
     until @round_counter == @settings[:rounds] || game_over
       match = Match.new(@settings)
@@ -296,16 +299,24 @@ class Game
     end
   end
 
-  def edit_settings
-    @settings.each do |name, value|
-      puts "#{name} is set to #{value}, would you like to change it? y/n"
-      input = gets.chomp
-      if input == 'y' && ( name == :duplicates || name == :intelligent_ai )
-        switch_setting(name)
-      elsif input == 'y'
-        puts 'please enter new value'
-        @settings[name] = gets.chomp.to_i
-      end
+  def handle_settings_selection(name)
+    case name
+    when :duplicates, :intelligent_ai
+      switch_setting(name)
+    when :rounds
+      change_number_of_rounds(gets.chomp.to_i)
+    else
+      puts 'please enter new value'
+      @settings[name] = gets.chomp.to_i
+    end
+  end
+
+  def change_number_of_rounds(number_of_rounds)
+    puts 'Number of rounds must be even'
+    if number_of_rounds.even?
+      @settings[:rounds] = number_of_rounds
+    else
+      change_number_of_rounds(gets.chomp.to_i)
     end
   end
 
@@ -330,17 +341,18 @@ quit = false
 until quit
   puts "\n Welcome to Mastermind! Hit 'Enter' to start, 'i' for " \
   "instructions, 's' to change settings, or type 'quit' to end\n"
-  pregame_input = gets.chomp
-  if pregame_input == 'quit'
+  game = Game.new
+  case gets.chomp
+  when 'quit'
     puts 'Exiting game'
     quit = true
     next
-  elsif pregame_input == 'i'
+  when 'i'
     puts INSTRUCTIONS
     next
+  when 's'
+    game.edit_settings
   end
-  game = Game.new
-  game.edit_settings if pregame_input == 's'
   game.play
   puts "\n New game starting"
   sleep(2)
